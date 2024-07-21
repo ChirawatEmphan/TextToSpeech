@@ -1,0 +1,85 @@
+<?php
+$accessToken = 'ใส่ AccessToken ของ Line';
+$content = file_get_contents('php://input');
+$events = json_decode($content, true);
+
+if (!is_null($events['events'])) {
+    foreach ($events['events'] as $event) {
+        if ($event['type'] == 'message' && $event['message']['type'] == 'text') {
+            $text = $event['message']['text'];
+            if (strtolower($text) == 'ต้องการเปลี่ยนข้อความเป็นเสียง') {
+                $replyText = 'กรุณาพิมพ์ข้อความที่ต้องการครับ';
+                replyMessage($accessToken, $event['replyToken'], $replyText);
+            } else {
+                $apiKey = 'ใส่ API KEY BOTNOI ของตัวเอง อย่าลืมใส่โค้ด cduck น้าาาา ขอบคุณค้าบบบ';
+                $apiUrl = 'https://api-voice.botnoi.ai/openapi/v1/generate_audio';
+
+                // Prepare data for POST request
+                $data = array(
+                    'text' => $text,
+                    'speaker' => '1',
+                    'volume' => 1,
+                    'speed' => 1,
+                    'type_media' => 'm4a',
+                    'save_file' => 'true',
+                    'language' => 'th'
+                );
+
+                // Initialize cURL
+                $ch = curl_init();
+                curl_setopt($ch, CURLOPT_URL, $apiUrl);
+                curl_setopt($ch, CURLOPT_POST, true);
+                curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+                curl_setopt($ch, CURLOPT_HTTPHEADER, array(
+                    'Content-Type: application/json',
+                    'Botnoi-Token: ' . $apiKey
+                ));
+                curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($data));
+
+                // Execute cURL and get response
+                $response = curl_exec($ch);
+                $httpcode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+                $error = curl_error($ch);
+                curl_close($ch);
+
+                // Decode JSON response
+                $responseData = json_decode($response, true);
+
+                // Check for errors
+                if ($httpcode != 200) {
+                    $replyText = 'เกิดข้อผิดพลาดในการแปลงข้อความเป็นเสียง. HTTP Code: ' . $httpcode . '. Error: ' . $error . '. Response: ' . $response;
+                } else if (isset($responseData['audio_url'])) {
+                    $audioUrl = $responseData['audio_url'];
+                    $replyText = 'เสียงของคุณ: ' . $audioUrl;
+                } else {
+                    $replyText = 'เกิดข้อผิดพลาดในการแปลงข้อความเป็นเสียง: ' . json_encode($responseData);
+                }
+
+                // Reply to user
+                replyMessage($accessToken, $event['replyToken'], $replyText);
+            }
+        }
+    }
+}
+
+function replyMessage($accessToken, $replyToken, $text) {
+    $message = [
+        'type' => 'text',
+        'text' => $text
+    ];
+    $data = [
+        'replyToken' => $replyToken,
+        'messages' => [$message]
+    ];
+    $post = json_encode($data);
+    $headers = array('Content-Type: application/json', 'Authorization: Bearer ' . $accessToken);
+    $ch = curl_init('https://api.line.me/v2/bot/message/reply');
+    curl_setopt($ch, CURLOPT_CUSTOMREQUEST, "POST");
+    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+    curl_setopt($ch, CURLOPT_POSTFIELDS, $post);
+    curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
+    curl_setopt($ch, CURLOPT_FOLLOWLOCATION, 1);
+    $result = curl_exec($ch);
+    curl_close($ch);
+}
+?>
